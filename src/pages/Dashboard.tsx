@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import { Helmet } from "react-helmet-async";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -14,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { v4 as uuidv4 } from 'uuid'; // Import uuid
 
 interface Session {
   id: string;
@@ -23,7 +25,9 @@ interface Session {
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const navigate = useNavigate(); // Hook for navigation
   const [sessionName, setSessionName] = useState("");
+  // In a real app, you'd fetch and save this to a database (like Firestore)
   const [sessions, setSessions] = useState<Session[]>([]);
 
   const canAdd = sessionName.trim().length > 1;
@@ -32,22 +36,31 @@ export default function Dashboard() {
     e.preventDefault();
     const name = sessionName.trim();
     if (!name) return;
+
+    // Create the new session object with a unique ID
     const newSession: Session = {
-      id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      id: uuidv4(), // Generate a unique ID for the session
       name,
       createdAt: Date.now(),
     };
+
+    // Add the new session to the local state
     setSessions((prev) => [newSession, ...prev]);
     setSessionName("");
-    toast({ title: "Session created", description: `“${name}” is ready.`, });
+
+    toast({ title: "Session created", description: `Joining “${name}”...` });
+    
+    // Immediately navigate to the new session page
+    navigate(`/session/${newSession.id}`);
   };
 
   const handleJoin = (s: Session) => {
     toast({
       title: "Joining session",
-      description: `Connecting to “${s.name}”. (Demo)`,
+      description: `Connecting to “${s.name}”...`,
     });
-    // Navigate or open connection here when backend is ready
+    // Navigate to the selected session page
+    navigate(`/session/${s.id}`);
   };
 
   const canonicalUrl = useMemo(() => {
@@ -102,7 +115,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-end">
                   <Button type="submit" disabled={!canAdd} aria-label="Add session">
-                    Add Session
+                    Add & Join Session
                   </Button>
                 </div>
               </form>

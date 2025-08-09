@@ -5,10 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { signUpWithEmail } from "@/firebase/auth"; // Assuming you created this file
+import { FirebaseError } from "firebase/app";
 
 export default function Signup() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -17,11 +20,48 @@ export default function Signup() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // TODO: Wire up Supabase auth when configured in this project
-    await new Promise((r) => setTimeout(r, 700));
-    setLoading(false);
-    toast({ title: "Account created", description: "Demo signup successful. Check your inbox to confirm when auth is connected." });
-    navigate("/");
+
+    try {
+      // Call the Firebase authentication function
+      await signUpWithEmail(email, password);
+
+      toast({
+        title: "Account Created!",
+        description: "Please log in to continue.",
+      });
+
+      // Redirect to the login page after successful signup
+      navigate("/login");
+
+    } catch (error) {
+      // Handle Firebase errors specifically
+      let description = "An unexpected error occurred. Please try again.";
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case "auth/email-already-in-use":
+            description = "This email is already in use. Please log in instead.";
+            break;
+          case "auth/invalid-email":
+            description = "Please enter a valid email address.";
+            break;
+          case "auth/weak-password":
+            description = "The password is too weak. It must be at least 6 characters long.";
+            break;
+          default:
+            description = error.message;
+            break;
+        }
+      }
+      
+      toast({
+        title: "Signup Failed",
+        description: description,
+        variant: "destructive",
+      });
+      console.error("Firebase signup error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -48,6 +88,7 @@ export default function Signup() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div className="grid gap-2">
@@ -59,6 +100,7 @@ export default function Signup() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <Button type="submit" className="w-full" disabled={loading} variant="hero">
@@ -68,7 +110,9 @@ export default function Signup() {
           </CardContent>
           <CardFooter className="flex items-center justify-between">
             <p className="text-sm text-muted-foreground">Already have an account?</p>
-            <Button asChild variant="link"><Link to="/login">Log in</Link></Button>
+            <Button asChild variant="link">
+              <Link to="/login">Log in</Link>
+            </Button>
           </CardFooter>
         </Card>
       </section>

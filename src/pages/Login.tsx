@@ -12,10 +12,13 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { signInWithEmail } from "@/firebase/auth"; // Assuming you created this file
+import { FirebaseError } from "firebase/app";
 
 export default function Login() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,11 +27,47 @@ export default function Login() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    // TODO: Wire up Supabase auth when configured in this project
-    await new Promise((r) => setTimeout(r, 600));
-    setLoading(false);
-    toast({ title: "Welcome back", description: "Demo login successful." });
-    navigate("/dashboard");
+
+    try {
+      // Call the Firebase sign-in function
+      await signInWithEmail(email, password);
+
+      toast({
+        title: "Welcome Back!",
+        description: "You have been successfully logged in.",
+      });
+
+      // Redirect to the dashboard on successful login
+      navigate("/dashboard");
+
+    } catch (error) {
+      // Handle Firebase errors
+      let description = "An unexpected error occurred. Please try again.";
+      if (error instanceof FirebaseError) {
+        switch (error.code) {
+          case "auth/user-not-found":
+          case "auth/wrong-password":
+          case "auth/invalid-credential":
+            description = "Invalid email or password. Please try again.";
+            break;
+          case "auth/invalid-email":
+            description = "Please enter a valid email address.";
+            break;
+          default:
+            description = "Failed to log in. Please check your credentials.";
+            break;
+        }
+      }
+
+      toast({
+        title: "Login Failed",
+        description: description,
+        variant: "destructive",
+      });
+      console.error("Firebase login error:", error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -62,6 +101,7 @@ export default function Login() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <div className="grid gap-2">
@@ -73,6 +113,7 @@ export default function Login() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
+                  disabled={loading}
                 />
               </div>
               <Button
