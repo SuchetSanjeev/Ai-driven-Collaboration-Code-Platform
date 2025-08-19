@@ -79,7 +79,7 @@ export default function Session() {
       const message: WebSocketMessage = JSON.parse(event.data);
       
       switch (message.type) {
-        case 'session_load': { // Added curly braces for scope
+        case 'session_load': {
           if (message.data) {
             const { code, selectedRuntimeIndex } = message.data;
             setCode(code || `// Welcome to the session!`);
@@ -90,13 +90,13 @@ export default function Session() {
           }
           break;
         }
-        case 'code_update': { // Added curly braces for scope
+        case 'code_update': {
           if (typeof message.code === 'string') {
             setCode(message.code);
           }
           break;
         }
-        case 'language_change': { // --- FIXED: Added curly braces for scope ---
+        case 'language_change': {
           const { selectedRuntimeIndex } = message; 
           if (selectedRuntimeIndex && runtimes[parseInt(selectedRuntimeIndex)]) {
             setSelectedRuntimeIndex(selectedRuntimeIndex);
@@ -126,6 +126,12 @@ export default function Session() {
       setIsRunning(false);
       return;
     }
+
+    // --- ADDED THIS LOGGING LINE ---
+    // This will show us the exact code being sent to the backend.
+    console.log("--- Executing Code ---", { code });
+    // ---
+
     const { language, version } = selectedRuntimeObject;
     try {
       const response = await fetch('http://localhost:3001/execute', {
