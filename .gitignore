@@ -7,6 +7,10 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+#gemini api key
+server/.env
+.env
+
 # Dependencies
 node_modules
 server/node_modules

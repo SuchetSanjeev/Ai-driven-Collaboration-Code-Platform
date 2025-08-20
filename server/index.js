@@ -1,3 +1,4 @@
+require('dotenv').config(); // Loads environment variables from .env file
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
@@ -46,13 +47,47 @@ app.post('/execute', async (req, res) => {
   }
 });
 
+// --- NEW: /explain-code endpoint ---
+app.post('/explain-code', async (req, res) => {
+    const { code, language } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ error: 'API key not configured on the server.' });
+    }
+    if (!code) {
+        return res.status(400).json({ error: 'Code snippet is required.' });
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    
+    const prompt = `Explain the following ${language} code snippet. Focus on its purpose, how it works, and any key concepts demonstrated. Format the output nicely using markdown:\n\n\`\`\`${language}\n${code}\n\`\`\``;
+
+    try {
+        const response = await axios.post(url, {
+            contents: [{ parts: [{ text: prompt }] }]
+        });
+
+        // Safely access the response text
+        const explanation = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (explanation) {
+            res.json({ explanation });
+        } else {
+            throw new Error("Invalid response structure from Gemini API.");
+        }
+
+    } catch (error) {
+        console.error("Gemini API Error:", error.response ? error.response.data : error.message);
+        res.status(500).json({ error: 'Failed to get explanation from the AI model.' });
+    }
+});
+
 // --- WebSocket Logic ---
 wss.on('connection', (ws) => {
   console.log('Client connected');
 
   ws.on('message', async (message) => {
     const data = JSON.parse(message);
-    // Destructure all possible properties from the message
     const { type, sessionId, code, selectedRuntimeIndex } = data;
 
     if (type === 'join') {
@@ -67,7 +102,6 @@ wss.on('connection', (ws) => {
         const docRef = db.collection('sessions').doc(sessionId);
         const doc = await docRef.get();
         if (doc.exists) {
-          // Send the full session data (code and language) to the new client
           ws.send(JSON.stringify({ type: 'session_load', data: doc.data() }));
         }
       } catch (error) {
@@ -78,13 +112,11 @@ wss.on('connection', (ws) => {
     if (type === 'code_update') {
       const currentSessionId = ws.sessionId;
       if (activeClients[currentSessionId]) {
-        // Broadcast to other clients
         activeClients[currentSessionId].forEach(client => {
           if (client !== ws && client.readyState === ws.OPEN) {
             client.send(JSON.stringify({ type: 'code_update', code }));
           }
         });
-        // Persist the code change to Firestore
         try {
           const docRef = db.collection('sessions').doc(currentSessionId);
           await docRef.set({ code }, { merge: true });
@@ -94,18 +126,14 @@ wss.on('connection', (ws) => {
       }
     }
 
-    // --- NEW: Handle language changes ---
     if (type === 'language_change') {
         const currentSessionId = ws.sessionId;
         if (activeClients[currentSessionId]) {
-            // Broadcast the language change to all clients
             activeClients[currentSessionId].forEach(client => {
-                // Send to all, including the original sender, to confirm the change
                 if (client.readyState === ws.OPEN) {
                     client.send(JSON.stringify({ type: 'language_change', selectedRuntimeIndex }));
                 }
             });
-            // Persist the language change to Firestore
             try {
                 const docRef = db.collection('sessions').doc(currentSessionId);
                 await docRef.set({ selectedRuntimeIndex }, { merge: true });

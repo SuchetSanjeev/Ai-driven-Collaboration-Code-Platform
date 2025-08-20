@@ -1,12 +1,14 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
-import Editor from '@monaco-editor/react';
+import Editor, { OnMount } from '@monaco-editor/react';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { PlayIcon, Loader2 } from 'lucide-react';
+import { PlayIcon, Loader2, SparklesIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
+import ReactMarkdown from 'react-markdown';
+import type { editor } from 'monaco-editor'; // Import the specific editor type
 
 const popularLanguages = [
   'javascript', 'typescript', 'python', 'java', 'c', 'c++', 'csharp', 'go', 'rust', 'r'
@@ -50,10 +52,14 @@ export default function Session() {
   const [code, setCode] = useState('// Loading session...');
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
   const [runtimes, setRuntimes] = useState<Runtime[]>([]);
   const [selectedRuntimeIndex, setSelectedRuntimeIndex] = useState('0');
   const [selectedRuntimeObject, setSelectedRuntimeObject] = useState<Runtime | null>(null);
   const ws = useRef<WebSocket | null>(null);
+  // --- FIXED: Use the specific type for the editor instance ---
+  const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   useEffect(() => {
     async function fetchRuntimes() {
@@ -104,13 +110,24 @@ export default function Session() {
           }
           break;
         }
-        default:
-          break;
       }
     };
     
     return () => ws.current?.close();
   }, [sessionId, runtimes]);
+
+  const handleEditorDidMount: OnMount = (editor, monaco) => {
+    editorRef.current = editor;
+    editor.onDidChangeCursorSelection(() => {
+        const selection = editor.getSelection();
+        if (selection && !selection.isEmpty()) {
+            const text = editor.getModel()?.getValueInRange(selection);
+            setSelectedText(text || '');
+        } else {
+            setSelectedText('');
+        }
+    });
+  };
 
   const handleEditorChange = (value?: string) => {
     const newCode = value || '';
@@ -126,12 +143,6 @@ export default function Session() {
       setIsRunning(false);
       return;
     }
-
-    // --- ADDED THIS LOGGING LINE ---
-    // This will show us the exact code being sent to the backend.
-    console.log("--- Executing Code ---", { code });
-    // ---
-
     const { language, version } = selectedRuntimeObject;
     try {
       const response = await fetch('http://localhost:3001/execute', {
@@ -150,6 +161,33 @@ export default function Session() {
       setOutput('An error occurred while trying to execute the code.');
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const handleExplainCode = async () => {
+    if (!selectedText || !selectedRuntimeObject) return;
+
+    setIsExplaining(true);
+    setOutput('🧠 AI is thinking...');
+    const { language } = selectedRuntimeObject;
+
+    try {
+        const response = await fetch('http://localhost:3001/explain-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: selectedText, language }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+            setOutput(result.explanation);
+        } else {
+            setOutput(`Error: ${result.error || 'An unknown error occurred.'}`);
+        }
+    } catch (error) {
+        console.error('Error explaining code:', error);
+        setOutput('An error occurred while trying to get an explanation.');
+    } finally {
+        setIsExplaining(false);
     }
   };
 
@@ -190,22 +228,39 @@ export default function Session() {
               </SelectContent>
             </Select>
           </div>
-          <Button onClick={handleRunCode} disabled={isRunning || runtimes.length === 0} className="self-end">
-            {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayIcon className="mr-2 h-4 w-4" />}
-            {isRunning ? 'Running...' : 'Run'}
-          </Button>
+          <div className="flex items-center gap-2 self-end">
+            {selectedText && (
+                <Button onClick={handleExplainCode} disabled={isExplaining} variant="outline" size="sm">
+                    {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4" />}
+                    Explain
+                </Button>
+            )}
+            <Button onClick={handleRunCode} disabled={isRunning || runtimes.length === 0}>
+              {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayIcon className="mr-2 h-4 w-4" />}
+              {isRunning ? 'Running...' : 'Run'}
+            </Button>
+          </div>
         </div>
       </header>
       
       <PanelGroup direction="vertical" className="flex-grow">
         <Panel defaultSize={70} minSize={20}>
-          <Editor height="100%" language={currentLanguageForEditor} theme="vs-dark" value={code} onChange={handleEditorChange} />
+          <Editor
+            height="100%"
+            language={currentLanguageForEditor}
+            theme="vs-dark"
+            value={code}
+            onMount={handleEditorDidMount}
+            onChange={handleEditorChange}
+          />
         </Panel>
         <PanelResizeHandle className="h-2 bg-muted-foreground/20 hover:bg-muted-foreground/40 transition-colors" />
         <Panel defaultSize={30} minSize={10}>
           <div className="h-full bg-[#1e1e1e] text-white font-mono p-4 overflow-auto">
             <h2 className="text-lg font-semibold mb-2 border-b border-gray-600">Output</h2>
-            <pre>{output}</pre>
+            <div className="prose prose-invert prose-sm max-w-none">
+              <ReactMarkdown>{output}</ReactMarkdown>
+            </div>
           </div>
         </Panel>
       </PanelGroup>
