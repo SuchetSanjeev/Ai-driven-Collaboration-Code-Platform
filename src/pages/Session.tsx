@@ -4,20 +4,19 @@ import Editor, { OnMount } from '@monaco-editor/react';
 import { Helmet } from 'react-helmet-async';
 import { Button } from '@/components/ui/button';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
-import { PlayIcon, Loader2, SparklesIcon } from 'lucide-react';
+import { PlayIcon, Loader2, SparklesIcon, Wand2 } from 'lucide-react'; // Added Wand2 icon
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from '@/components/ui/label';
 import ReactMarkdown from 'react-markdown';
-import type { editor } from 'monaco-editor'; // Import the specific editor type
+import type { editor } from 'monaco-editor';
 
+// --- (Constants like popularLanguages, languageToMonacoId, etc. remain the same) ---
 const popularLanguages = [
   'javascript', 'typescript', 'python', 'java', 'c', 'c++', 'csharp', 'go', 'rust', 'r'
 ];
-
 const languageToMonacoId: { [key: string]: string } = {
   'c++': 'cpp', 'csharp': 'csharp', 'typescript': 'typescript',
 };
-
 const defaultCodeSnippets: { [key: string]: string } = {
   javascript: 'console.log("Hello from JavaScript!");',
   typescript: 'console.log("Hello from TypeScript!");',
@@ -36,13 +35,9 @@ interface Runtime {
   version: string;
   aliases: string[];
 }
-
 type WebSocketMessage = {
     type: 'session_load' | 'code_update' | 'language_change';
-    data?: {
-        code: string;
-        selectedRuntimeIndex: string;
-    };
+    data?: { code: string; selectedRuntimeIndex: string; };
     code?: string;
     selectedRuntimeIndex?: string;
 }
@@ -52,13 +47,16 @@ export default function Session() {
   const [code, setCode] = useState('// Loading session...');
   const [output, setOutput] = useState('');
   const [isRunning, setIsRunning] = useState(false);
-  const [isExplaining, setIsExplaining] = useState(false);
-  const [selectedText, setSelectedText] = useState('');
   const [runtimes, setRuntimes] = useState<Runtime[]>([]);
   const [selectedRuntimeIndex, setSelectedRuntimeIndex] = useState('0');
   const [selectedRuntimeObject, setSelectedRuntimeObject] = useState<Runtime | null>(null);
   const ws = useRef<WebSocket | null>(null);
-  // --- FIXED: Use the specific type for the editor instance ---
+  
+  // --- States for AI features ---
+  const [isExplaining, setIsExplaining] = useState(false);
+  const [isFixing, setIsFixing] = useState(false); // New loading state for fixing
+  const [selectedText, setSelectedText] = useState('');
+  const [suggestedFix, setSuggestedFix] = useState<string | null>(null); // New state for the suggested code
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
 
   useEffect(() => {
@@ -125,6 +123,7 @@ export default function Session() {
             setSelectedText(text || '');
         } else {
             setSelectedText('');
+            setSuggestedFix(null); // Clear suggestion when selection is cleared
         }
     });
   };
@@ -138,6 +137,7 @@ export default function Session() {
   const handleRunCode = async () => {
     setIsRunning(true);
     setOutput('');
+    setSuggestedFix(null);
     if (!selectedRuntimeObject) {
       setOutput('Error: No language selected.');
       setIsRunning(false);
@@ -166,11 +166,10 @@ export default function Session() {
 
   const handleExplainCode = async () => {
     if (!selectedText || !selectedRuntimeObject) return;
-
     setIsExplaining(true);
     setOutput('🧠 AI is thinking...');
+    setSuggestedFix(null); // Clear any previous fix
     const { language } = selectedRuntimeObject;
-
     try {
         const response = await fetch('http://localhost:3001/explain-code', {
             method: 'POST',
@@ -189,6 +188,50 @@ export default function Session() {
     } finally {
         setIsExplaining(false);
     }
+  };
+
+  // --- NEW: Function to find bugs and suggest fixes ---
+  const handleFixCode = async () => {
+    if (!selectedText || !selectedRuntimeObject) return;
+
+    setIsFixing(true);
+    setOutput('🤖 AI is analyzing for bugs...');
+    setSuggestedFix(null);
+    const { language } = selectedRuntimeObject;
+
+    try {
+        const response = await fetch('http://localhost:3001/fix-code', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code: selectedText, language }),
+        });
+        const result = await response.json();
+        if (response.ok) {
+            setOutput(result.explanation);
+            setSuggestedFix(result.fixedCode);
+        } else {
+            setOutput(`Error: ${result.error || 'An unknown error occurred.'}`);
+        }
+    } catch (error) {
+        console.error('Error fixing code:', error);
+        setOutput('An error occurred while trying to analyze the code.');
+    } finally {
+        setIsFixing(false);
+    }
+  };
+
+  // --- NEW: Function to apply the AI's suggested fix ---
+  const handleApplyFix = () => {
+    if (!suggestedFix || !editorRef.current) return;
+    const selection = editorRef.current.getSelection();
+    if (selection) {
+        // This command replaces the selected text with the suggested fix
+        editorRef.current.executeEdits('ai-fix', [{
+            range: selection,
+            text: suggestedFix,
+        }]);
+    }
+    setSuggestedFix(null); // Clear the suggestion after applying it
   };
 
   const handleLanguageChange = (indexStr: string) => {
@@ -229,13 +272,20 @@ export default function Session() {
             </Select>
           </div>
           <div className="flex items-center gap-2 self-end">
+            {/* --- UPDATED: AI Action Buttons --- */}
             {selectedText && (
-                <Button onClick={handleExplainCode} disabled={isExplaining} variant="outline" size="sm">
-                    {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4" />}
-                    Explain
-                </Button>
+                <>
+                    <Button onClick={handleExplainCode} disabled={isExplaining || isFixing} variant="outline" size="sm">
+                        {isExplaining ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <SparklesIcon className="mr-2 h-4 w-4" />}
+                        Explain
+                    </Button>
+                    <Button onClick={handleFixCode} disabled={isFixing || isExplaining} variant="outline" size="sm">
+                        {isFixing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Wand2 className="mr-2 h-4 w-4" />}
+                        Analyze & Fix
+                    </Button>
+                </>
             )}
-            <Button onClick={handleRunCode} disabled={isRunning || runtimes.length === 0}>
+            <Button onClick={handleRunCode} disabled={isRunning || isExplaining || isFixing}>
               {isRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlayIcon className="mr-2 h-4 w-4" />}
               {isRunning ? 'Running...' : 'Run'}
             </Button>
@@ -256,11 +306,23 @@ export default function Session() {
         </Panel>
         <PanelResizeHandle className="h-2 bg-muted-foreground/20 hover:bg-muted-foreground/40 transition-colors" />
         <Panel defaultSize={30} minSize={10}>
-          <div className="h-full bg-[#1e1e1e] text-white font-mono p-4 overflow-auto">
+          <div className="h-full bg-[#1e1e1e] text-white p-4 overflow-auto">
             <h2 className="text-lg font-semibold mb-2 border-b border-gray-600">Output</h2>
             <div className="prose prose-invert prose-sm max-w-none">
               <ReactMarkdown>{output}</ReactMarkdown>
             </div>
+            {/* --- NEW: Display for suggested fix --- */}
+            {suggestedFix && (
+                <div className="mt-4">
+                    <h3 className="text-md font-semibold mb-2 text-yellow-400">Suggested Fix:</h3>
+                    <div className="bg-black bg-opacity-30 rounded-md p-2 relative">
+                        <pre className="text-xs whitespace-pre-wrap">{suggestedFix}</pre>
+                        <Button onClick={handleApplyFix} size="sm" className="absolute top-2 right-2">
+                            Apply Fix
+                        </Button>
+                    </div>
+                </div>
+            )}
           </div>
         </Panel>
       </PanelGroup>

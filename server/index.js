@@ -1,9 +1,10 @@
-require('dotenv').config(); // Loads environment variables from .env file
+require('dotenv').config();
 const express = require('express');
 const http = require('http');
 const { WebSocketServer } = require('ws');
 const admin = require('firebase-admin');
 const axios = require('axios');
+const cors = require('cors'); // Import the cors package
 
 // --- Firebase Admin Setup ---
 const serviceAccount = require('./serviceAccountKey.json');
@@ -13,12 +14,10 @@ admin.initializeApp({
 const db = admin.firestore();
 
 const app = express();
+
+// --- UPDATED: Use the cors middleware to handle all CORS requests correctly ---
+app.use(cors());
 app.use(express.json());
-app.use((req, res, next) => {
-  res.header('Access-Control-Allow-Origin', '*');
-  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
-  next();
-});
 
 const server = http.createServer(app);
 const wss = new WebSocketServer({ server });
@@ -47,7 +46,7 @@ app.post('/execute', async (req, res) => {
   }
 });
 
-// --- NEW: /explain-code endpoint ---
+// --- /explain-code endpoint ---
 app.post('/explain-code', async (req, res) => {
     const { code, language } = req.body;
     const apiKey = process.env.GEMINI_API_KEY;
@@ -68,7 +67,6 @@ app.post('/explain-code', async (req, res) => {
             contents: [{ parts: [{ text: prompt }] }]
         });
 
-        // Safely access the response text
         const explanation = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (explanation) {
             res.json({ explanation });
@@ -77,8 +75,50 @@ app.post('/explain-code', async (req, res) => {
         }
 
     } catch (error) {
-        console.error("Gemini API Error:", error.response ? error.response.data : error.message);
+        console.error("Gemini API Error (explain-code):", error.response ? error.response.data : error.message);
         res.status(500).json({ error: 'Failed to get explanation from the AI model.' });
+    }
+});
+
+// --- NEW: /fix-code endpoint ---
+app.post('/fix-code', async (req, res) => {
+    const { code, language } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+        return res.status(500).json({ error: 'API key not configured.' });
+    }
+    if (!code) {
+        return res.status(400).json({ error: 'Code is required.' });
+    }
+
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
+    
+    const prompt = `Analyze the following ${language} code snippet for bugs, logical errors, or anti-patterns. 
+    If you find any issues, provide a brief explanation of the problem and the corrected code. 
+    Respond ONLY with a valid JSON object containing two keys: "explanation" (a markdown string explaining the bug) and "fixedCode" (a string containing ONLY the corrected code snippet).
+    
+    Code:
+    \`\`\`${language}
+    ${code}
+    \`\`\``;
+
+    try {
+        const response = await axios.post(url, {
+            contents: [{ parts: [{ text: prompt }] }]
+        });
+
+        const rawText = response.data.candidates[0].content.parts[0].text;
+        
+        // Clean the response to ensure it's valid JSON before parsing
+        const jsonString = rawText.replace(/```json/g, '').replace(/```/g, '').trim();
+        const parsedResponse = JSON.parse(jsonString);
+
+        res.json(parsedResponse);
+
+    } catch (error) {
+        console.error("Gemini API Error (fix-code):", error.response ? error.response.data : error.message);
+        res.status(500).json({ error: 'Failed to get fix from AI.' });
     }
 });
 
