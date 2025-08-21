@@ -39,3 +39,56 @@ Follow these steps to get the project running on your local machine.
 git clone [https://github.com/your-username/ai-driven-collaboration-code-platform.git](https://github.com/your-username/ai-driven-collaboration-code-platform.git)
 cd ai-driven-collaboration-code-platform
 ```
+
+## 2. Frontend Setup
+
+Navigate to the root directory and install the necessary dependencies.
+
+```Bash
+npm install
+```
+Create a .env.local file in the root directory and add your Firebase project's configuration keys:
+
+```Firebase API
+VITE_FIREBASE_API_KEY=your_api_key
+VITE_FIREBASE_AUTH_DOMAIN=your_auth_domain
+VITE_FIREBASE_PROJECT_ID=your_project_id
+VITE_FIREBASE_STORAGE_BUCKET=your_storage_bucket
+VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+VITE_FIREBASE_APP_ID=your_app_id
+```
+
+## 3. Backend Setup
+
+Navigate to the server directory and install its dependencies.
+
+```Bash
+cd server
+npm install
+Add Firebase Service Account Key:
+```
+
+**Add Gemini API Key:**
+```
+Add your Google Gemini API key to the .env file inside the server directory:
+GEMINI_API_KEY=your_gemini_api_key
+```
+
+## 4. Running the Application
+You'll need two separate terminals to run both the frontend and backend servers.
+
+In Terminal 1 (from the project root):
+
+```Bash
+npm run dev
+```
+Your React application will be running on [localhost:5173](http://localhost:5173.)
+
+In Terminal 2 (from the server directory):
+
+```Bash
+node index.js
+```
+
+Your backend server will be running on [localhost:3001](http://localhost:3001.)
+You can now open your browser and navigate to the URL to start using the application!
