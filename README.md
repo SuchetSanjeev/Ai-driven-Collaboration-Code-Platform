@@ -1,6 +1,6 @@
 # CollabCode AI 🚀
 
-CollabCode AI is a full-stack, AI-driven collaborative coding platform designed for real-time development and intelligent code assistance. This web-based IDE allows multiple users to join coding sessions, write and execute code together in over 10 languages, and leverage the power of Google's Gemini AI to explain code and fix bugs on the fly.
+CollabCode AI is a full-stack, AI-driven collaborative coding platform designed for real-time development and intelligent code assistance. This web-based IDE allows multiple users to join coding sessions, write and execute code together in over 10 languages inside the Monaco Editor with the piston API, and leverage the power of Google's Gemini AI to explain code and fix bugs on the fly.
 
 ## ✨ Features
 
@@ -20,7 +20,7 @@ CollabCode AI is a full-stack, AI-driven collaborative coding platform designed 
 - **Database**: Google Firestore
 - **Authentication**: Firebase Authentication
 - **AI Integration**: Google Gemini API
-- **Code Execution**: Piston API
+- **Code Execution**: Piston API and Monaco Editor
 
 ## ⚙️ Local Setup & Installation
 
