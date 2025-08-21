@@ -2,10 +2,10 @@
 
 CollabCode AI is a full-stack, AI-driven collaborative coding platform designed for real-time development and intelligent code assistance. This web-based IDE allows multiple users to join coding sessions, write and execute code together in over 10 languages inside the Monaco Editor with the piston API, and leverage the power of Google's Gemini AI to explain code and fix bugs on the fly.
 
-<img width="500" height="500" alt="CollabCodeAI_landingpage" src="https://github.com/user-attachments/assets/4f1166c7-8f26-43f4-b4a5-7733f6417793" />
-<img width="500" height="500" alt="CollabCodeAI_Dashboard" src="https://github.com/user-attachments/assets/62d32074-6495-4d99-926b-8e77adda45bc" />
-<img width="500" height="500" alt="Screenshot 2025-08-21 123643" src="https://github.com/user-attachments/assets/76d9c26f-5ad5-4de6-9027-5eccdae86aeb" />
-<img width="500" height="500" alt="CollabCodeAI_analyzeAndFixFeature" src="https://github.com/user-attachments/assets/8ab02598-001b-4c9a-9062-ca48d2740167" />
+<img width="1000" height="1000" alt="CollabCodeAI_landingpage" src="https://github.com/user-attachments/assets/4f1166c7-8f26-43f4-b4a5-7733f6417793" />
+<img width="1000" height="1000" alt="CollabCodeAI_Dashboard" src="https://github.com/user-attachments/assets/62d32074-6495-4d99-926b-8e77adda45bc" />
+<img width="1000" height="1000" alt="Screenshot 2025-08-21 123643" src="https://github.com/user-attachments/assets/76d9c26f-5ad5-4de6-9027-5eccdae86aeb" />
+<img width="1000" height="1000" alt="CollabCodeAI_analyzeAndFixFeature" src="https://github.com/user-attachments/assets/8ab02598-001b-4c9a-9062-ca48d2740167" />
 
 ## ✨ Features
 
